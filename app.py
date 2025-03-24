@@ -2,24 +2,32 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 import tensorflow as tf
 from tensorflow.keras.models import load_model
 from sklearn.preprocessing import MinMaxScaler
 
 # Load the trained model
-model = load_model("stock_price_lstm_model.h5")  # Make sure this model is saved
+model = load_model("stock_price_lstm_model.h5")  # Ensure this model is saved
 
-# Streamlit UI
-st.title("📈 AI-Powered Stock Price Predictor")
+# Streamlit UI - Sidebar
+st.sidebar.title("📊 AI Stock Price Predictor")
+st.sidebar.write("Choose a stock and prediction settings below:")
 
 # Select stock
-stock_symbol = st.text_input("Enter Stock Symbol (e.g., AAPL, TSLA, GOOGL):", "AAPL")
-future_days = st.slider("Select Future Days for Prediction:", min_value=7, max_value=365, value=30)
+stock_list = ["AAPL", "TSLA", "GOOGL", "AMZN", "MSFT"]
+stock_symbol = st.sidebar.selectbox("Select Stock Symbol", stock_list)
 
-# Download stock data
-st.write(f"Fetching stock data for **{stock_symbol}**...")
-data = yf.download(stock_symbol, start="2020-01-01", end="2025-01-01")
+# Select date range
+start_date = st.sidebar.date_input("Start Date", pd.to_datetime("2020-01-01"))
+end_date = st.sidebar.date_input("End Date", pd.to_datetime("2025-01-01"))
+
+# Select future prediction days
+future_days = st.sidebar.slider("Days to Predict", min_value=7, max_value=365, value=30)
+
+# Fetch stock data
+st.sidebar.write(f"📥 Fetching stock data for **{stock_symbol}**...")
+data = yf.download(stock_symbol, start=start_date, end=end_date)
 df = data[['Close']].dropna()  # Keep only closing prices
 
 # Normalize the data
@@ -43,14 +51,26 @@ future_predictions = scaler.inverse_transform(np.array(future_predictions).resha
 last_date = df.index[-1]
 future_dates = pd.date_range(start=last_date, periods=future_days + 1)[1:]
 
-# Plot results
-fig, ax = plt.subplots(figsize=(12,6))
-ax.plot(df.index, df['Close'], label="Actual Prices", color='blue')
-ax.plot(future_dates, future_predictions, label="Predicted Prices", color='green')
-ax.set_title(f"{stock_symbol} Stock Price Prediction")
-ax.set_xlabel("Date")
-ax.set_ylabel("Stock Price (USD)")
-ax.legend()
-st.pyplot(fig)
+# Plot Actual Prices with Moving Averages
+fig = go.Figure()
+
+fig.add_trace(go.Scatter(x=df.index, y=df['Close'], mode='lines', name="Actual Prices", line=dict(color='blue')))
+fig.add_trace(go.Scatter(x=future_dates, y=future_predictions.flatten(), mode='lines', name="Future Predictions", line=dict(color='green')))
+
+# Calculate Moving Averages
+df['SMA50'] = df['Close'].rolling(window=50).mean()
+df['SMA200'] = df['Close'].rolling(window=200).mean()
+
+# Add Moving Averages to Chart
+fig.add_trace(go.Scatter(x=df.index, y=df['SMA50'], mode='lines', name="50-Day SMA", line=dict(color='orange')))
+fig.add_trace(go.Scatter(x=df.index, y=df['SMA200'], mode='lines', name="200-Day SMA", line=dict(color='red')))
+
+fig.update_layout(title=f"{stock_symbol} Stock Price Prediction",
+                  xaxis_title="Date",
+                  yaxis_title="Stock Price (USD)",
+                  legend=dict(x=0, y=1),
+                  template="plotly_dark")
+
+st.plotly_chart(fig)
 
 st.success("✅ Prediction Complete! Adjust settings above to see different results.")
