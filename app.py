@@ -59,31 +59,54 @@ future_predictions = scaler.inverse_transform(np.array(future_predictions).resha
 last_date = df.index[-1]
 future_dates = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=future_days)
 
-# Plot Actual Prices with Moving Averages
+# Plot Actual Prices & Predictions
 fig = go.Figure()
 
 # Actual Stock Prices
-fig.add_trace(go.Scatter(x=df.index, y=df['Close'], mode='lines', name="Actual Prices", line=dict(color='blue')))
+fig.add_trace(go.Scatter(
+    x=df.index, 
+    y=df['Close'], 
+    mode='lines', 
+    name="Actual Prices", 
+    line=dict(color='blue')
+))
 
 # Future Predicted Prices
-fig.add_trace(go.Scatter(x=future_dates, y=future_predictions.flatten(), mode='lines', name="Future Predictions", line=dict(color='green')))
+fig.add_trace(go.Scatter(
+    x=future_dates, 
+    y=future_predictions.flatten(), 
+    mode='lines', 
+    name="Future Predictions", 
+    line=dict(color='green')
+))
 
-# Calculate Moving Averages
+# Add Moving Averages
 df['SMA50'] = df['Close'].rolling(window=50).mean()
 df['SMA200'] = df['Close'].rolling(window=200).mean()
 
-# Add Moving Averages to Chart
-fig.add_trace(go.Scatter(x=df.index, y=df['SMA50'], mode='lines', name="50-Day SMA", line=dict(color='orange')))
-fig.add_trace(go.Scatter(x=df.index, y=df['SMA200'], mode='lines', name="200-Day SMA", line=dict(color='red')))
+fig.add_trace(go.Scatter(
+    x=df.index, 
+    y=df['SMA50'], 
+    mode='lines', 
+    name="50-Day SMA", 
+    line=dict(color='orange')
+))
 
-# Update layout
+fig.add_trace(go.Scatter(
+    x=df.index, 
+    y=df['SMA200'], 
+    mode='lines', 
+    name="200-Day SMA", 
+    line=dict(color='red')
+))
+
+# Update Layout for Proper Date Formatting
 fig.update_layout(
     title=f"{stock_symbol} Stock Price Prediction",
-    xaxis_title="Date",
+    xaxis=dict(title="Date", type="date"),  # Ensure x-axis is treated as dates
     yaxis_title="Stock Price (USD)",
     template="plotly_dark"
 )
 
-st.plotly_chart(fig)
-
-st.success("✅ Prediction Complete! Adjust settings above to see different results.")
+# Display the graph in Streamlit
+st.plotly_chart(fig, use_container_width=True)
