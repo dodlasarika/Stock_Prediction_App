@@ -27,8 +27,16 @@ future_days = st.sidebar.slider("Days to Predict", min_value=7, max_value=365, v
 
 # Fetch stock data
 st.sidebar.write(f"📥 Fetching stock data for **{stock_symbol}**...")
-data = yf.download(stock_symbol, start=start_date, end=end_date)
-df = data[['Close']].dropna()  # Keep only closing prices
+try:
+    data = yf.download(stock_symbol, start=start_date, end=end_date)
+    df = data[['Close']].dropna()  # Keep only closing prices
+except Exception as e:
+    st.error(f"❌ Error fetching stock data: {e}")
+    st.stop()
+
+if df.empty:
+    st.warning("⚠️ No data available for the selected stock and date range.")
+    st.stop()
 
 # Normalize the data
 scaler = MinMaxScaler(feature_range=(0, 1))
@@ -49,12 +57,15 @@ future_predictions = scaler.inverse_transform(np.array(future_predictions).resha
 
 # Create future dates
 last_date = df.index[-1]
-future_dates = pd.date_range(start=last_date, periods=future_days + 1)[1:]
+future_dates = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=future_days)
 
 # Plot Actual Prices with Moving Averages
 fig = go.Figure()
 
+# Actual Stock Prices
 fig.add_trace(go.Scatter(x=df.index, y=df['Close'], mode='lines', name="Actual Prices", line=dict(color='blue')))
+
+# Future Predicted Prices
 fig.add_trace(go.Scatter(x=future_dates, y=future_predictions.flatten(), mode='lines', name="Future Predictions", line=dict(color='green')))
 
 # Calculate Moving Averages
@@ -65,11 +76,13 @@ df['SMA200'] = df['Close'].rolling(window=200).mean()
 fig.add_trace(go.Scatter(x=df.index, y=df['SMA50'], mode='lines', name="50-Day SMA", line=dict(color='orange')))
 fig.add_trace(go.Scatter(x=df.index, y=df['SMA200'], mode='lines', name="200-Day SMA", line=dict(color='red')))
 
-fig.update_layout(title=f"{stock_symbol} Stock Price Prediction",
-                  xaxis_title="Date",
-                  yaxis_title="Stock Price (USD)",
-                  legend=dict(x=0, y=1),
-                  template="plotly_dark")
+# Update layout
+fig.update_layout(
+    title=f"{stock_symbol} Stock Price Prediction",
+    xaxis_title="Date",
+    yaxis_title="Stock Price (USD)",
+    template="plotly_dark"
+)
 
 st.plotly_chart(fig)
 
