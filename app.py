@@ -27,12 +27,13 @@ future_days = st.sidebar.slider("Days to Predict", min_value=7, max_value=365, v
 
 # Fetch stock data
 st.sidebar.write(f"📥 Fetching stock data for **{stock_symbol}**...")
-try:
-    data = yf.download(stock_symbol, start=start_date, end=end_date)
-    df = data[['Close']].dropna()  # Keep only closing prices
-except Exception as e:
-    st.error(f"❌ Error fetching stock data: {e}")
-    st.stop()
+with st.spinner("Downloading stock data..."):
+    try:
+        data = yf.download(stock_symbol, start=start_date, end=end_date)
+        df = data[['Close']].dropna()  # Keep only closing prices
+    except Exception as e:
+        st.error(f"❌ Error fetching stock data: {e}")
+        st.stop()
 
 if df.empty:
     st.warning("⚠️ No data available for the selected stock and date range.")
@@ -59,54 +60,58 @@ future_predictions = scaler.inverse_transform(np.array(future_predictions).resha
 last_date = df.index[-1]
 future_dates = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=future_days)
 
-# Plot Actual Prices & Predictions
+# Plot Actual Prices & Predictions using Candlestick Chart
 fig = go.Figure()
 
-# Actual Stock Prices
-fig.add_trace(go.Scatter(
-    x=df.index, 
-    y=df['Close'], 
-    mode='lines', 
-    name="Actual Prices", 
-    line=dict(color='blue')
+# Actual Stock Prices as a Candlestick Chart
+fig.add_trace(go.Candlestick(
+    x=df.index,
+    open=data["Open"],
+    high=data["High"],
+    low=data["Low"],
+    close=df["Close"],
+    name="Actual Prices",
+    increasing_line_color='blue',
+    decreasing_line_color='red'
 ))
 
 # Future Predicted Prices
 fig.add_trace(go.Scatter(
-    x=future_dates, 
-    y=future_predictions.flatten(), 
-    mode='lines', 
-    name="Future Predictions", 
-    line=dict(color='green')
+    x=future_dates,
+    y=future_predictions.flatten(),
+    mode='lines',
+    name="Future Predictions",
+    line=dict(color='green', width=2, dash="dash")  # Dashed line for future predictions
 ))
 
 # Add Moving Averages
-df['SMA50'] = df['Close'].rolling(window=50).mean()
-df['SMA200'] = df['Close'].rolling(window=200).mean()
+df["SMA50"] = df["Close"].rolling(window=50).mean()
+df["SMA200"] = df["Close"].rolling(window=200).mean()
 
 fig.add_trace(go.Scatter(
     x=df.index, 
-    y=df['SMA50'], 
-    mode='lines', 
+    y=df["SMA50"], 
+    mode="lines", 
     name="50-Day SMA", 
-    line=dict(color='orange')
+    line=dict(color="orange")
 ))
 
 fig.add_trace(go.Scatter(
     x=df.index, 
-    y=df['SMA200'], 
-    mode='lines', 
+    y=df["SMA200"], 
+    mode="lines", 
     name="200-Day SMA", 
-    line=dict(color='red')
+    line=dict(color="red")
 ))
 
-# Update Layout for Proper Date Formatting
+# Update Layout to Ensure Date Formatting
 fig.update_layout(
     title=f"{stock_symbol} Stock Price Prediction",
-    xaxis=dict(title="Date", type="date"),  # Ensure x-axis is treated as dates
+    xaxis=dict(title="Date", type="date"),
     yaxis_title="Stock Price (USD)",
+    xaxis_rangeslider_visible=False,
     template="plotly_dark"
 )
 
-# Display the graph in Streamlit
+# Display the Graph in Streamlit
 st.plotly_chart(fig, use_container_width=True)
