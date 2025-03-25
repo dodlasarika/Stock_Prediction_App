@@ -6,9 +6,15 @@ import plotly.graph_objects as go
 import tensorflow as tf
 from tensorflow.keras.models import load_model
 from sklearn.preprocessing import MinMaxScaler
+from newsapi import NewsApiClient  # ✅ Added NewsAPI for stock news
+from textblob import TextBlob  # ✅ Added TextBlob for sentiment analysis
+import datetime
 
 # Load the trained model
 model = load_model("stock_price_lstm_model.h5")  # Ensure this model is saved
+
+# Initialize NewsAPI (Replace 'YOUR_NEWSAPI_KEY' with your actual key)
+newsapi = NewsApiClient(api_key="058d6155c198466ea75d5ce4efdacb4b")
 
 # Streamlit UI - Sidebar
 st.sidebar.title("📊 AI Stock Price Predictor")
@@ -115,3 +121,41 @@ fig.update_layout(
 
 # Display the Graph in Streamlit
 st.plotly_chart(fig, use_container_width=True)
+
+### 🔹 Add News & Sentiment Analysis Section ###
+st.subheader(f"📰 Latest {stock_symbol} News & Sentiment Analysis")
+
+def fetch_stock_news(stock_symbol):
+    """Fetch latest news articles related to the selected stock."""
+    today = datetime.datetime.today().strftime('%Y-%m-%d')
+    articles = newsapi.get_everything(q=stock_symbol, from_param=today, language='en', sort_by='relevancy')
+    
+    news_list = []
+    for article in articles['articles'][:5]:  # Limit to 5 latest articles
+        title = article['title']
+        url = article['url']
+        description = article['description'] or "No description available"
+        sentiment = analyze_sentiment(description)
+        news_list.append({"title": title, "url": url, "sentiment": sentiment})
+    
+    return news_list
+
+def analyze_sentiment(text):
+    """Analyze sentiment of the news article (Positive, Negative, Neutral)."""
+    analysis = TextBlob(text)
+    polarity = analysis.sentiment.polarity
+    if polarity > 0:
+        return "🟢 Positive"
+    elif polarity < 0:
+        return "🔴 Negative"
+    else:
+        return "🟡 Neutral"
+
+# Fetch & Display News
+news_articles = fetch_stock_news(stock_symbol)
+
+if news_articles:
+    for news in news_articles:
+        st.write(f"**[{news['title']}]({news['url']})** - {news['sentiment']}")
+else:
+    st.write("No recent news found for this stock.")
